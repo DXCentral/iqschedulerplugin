@@ -1,6 +1,16 @@
 # IQ Recorder and Scheduler for SDR#
 
-Preview 1.0.4.0 for SDR# 1922 Beta, Windows x64. The version appears at the top of the plugin. Built with the Airspy VDK and .NET 10. Successful SpyServer captures have been reported during user testing; independent RF-quality comparison and long-duration validation remain outstanding.
+Preview 1.0.6.0 for SDR# 1922 Beta, Windows x64. The version appears at the top of the plugin. Built with the Airspy VDK and .NET 10. Successful SpyServer captures have been reported during user testing; independent RF-quality comparison and long-duration validation remain outstanding.
+
+## Optional compact Show/Hide panel
+
+Check **Use compact Show/Hide panel** at the top of the full interface. The dockable plugin panel becomes a single button. Dock that launcher at the left, right, top or bottom, or stack it with other panels.
+
+**Show** opens the full interface in a separate floating window; **Hide** removes it from view. The full window's **X** also hides it. The same interface instance is retained, including selections and edits. The choice is remembered separately for each plugin, and floating-window position and size survive a normal SDR# restart. Full windows start hidden when compact mode is restored.
+
+Uncheck the option in the floating interface to return the full interface to its normal dockable panel. No restart is needed. If the old dock area remains large after conversion, resize it to the button height; SDR# controls and saves the surrounding docking layout. The floating full interface scrolls when resized smaller so its controls remain reachable.
+
+Hiding a window changes presentation only. SDR# must remain open for ongoing playback, recording and scheduled jobs. Each plugin has its own launcher and floating window; neither requires the other plugin to be installed.
 
 ## Install
 
@@ -10,7 +20,7 @@ Preview 1.0.4.0 for SDR# 1922 Beta, Windows x64. The version appears at the top 
 
 The preview ZIP is the package for users. The source ZIP is for developers. SDR# itself, radio drivers, personal settings, test recordings, and receiver connections are not included.
 
-Keep exactly one installed IQ Scheduler DLL under the Plugins tree. An older loose `Plugins\SDRSharp.IQScheduler.dll`, or another copy under `Plugins\Plugins`, can cause old code or duplicate plugin instances to load. With SDR# closed, move those old DLL copies to a backup folder **outside Plugins**, then extract the package at the installation root. Preserve SDRSharp.config and recordings. Verify **Plugin 1.0.4.0** appears after restarting.
+Keep exactly one installed IQ Scheduler DLL under the Plugins tree. An older loose `Plugins\SDRSharp.IQScheduler.dll`, or another copy under `Plugins\Plugins`, can cause old code or duplicate plugin instances to load. With SDR# closed, move those old DLL copies to a backup folder **outside Plugins**, then extract the package at the installation root. Preserve SDRSharp.config and recordings. Verify **Plugin 1.0.6.0** appears after restarting.
 
 ## Record now
 
@@ -140,9 +150,18 @@ The two tab contents receive their own theme pass, including after theme changes
 
 See `LICENSE.txt` for the Airspy VDK license, including its Airspy ecosystem restriction. This package is intended as an SDR# plugin; the license notice must accompany redistribution.
 
+## Live Rewind companion (1.0.5)
 
+When Live Rewind is installed in the same SDR# window, recording uses its original live-IQ tap. Rewinding or pausing listening does not rewind the recording. Live Rewind can review the active recording, follow file splits and narrow-IQ sample rates, and retain the pre-recording buffer without writing a second ongoing recording. Earlier Scheduler versions must be updated before enabling Live Rewind.
 
+Live Rewind holds the current IQ center while buffering/reviewing. Turn its buffer off before a scheduled job on that receiver needs to retune to a different center. Other receiver windows have independent streams. Disabling Live Rewind leaves a Scheduler recording running; its **Stop Recording & New Buffer** button explicitly finishes the local run.
 
+The active-file index publishes sample counts after flushing buffered writes. This makes committed samples readable during recording; it is not a promise of hardware-timestamp accuracy or durable disk flush per block. Ordinary recording still works without Live Rewind installed.
 
+Native validation of 1.0.5 in SDR# 1922 covered original live-IQ routing during rewound listening, readable committed PCM samples, four file segments, 250 kS/s narrow recording replayed at 1.2288 MS/s through the native resampler, and center-lock handoff when Live Rewind was disabled during a recording. These tests used a Linrad-derived IQ file with a test-only Live Rewind source override, rather than a physical live receiver.
 
+## Compact launcher validation
 
+The compact launchers were tested together in an isolated SDR# 1922 instance using the supplied Linrad-derived 1.2288 MS/s IQ WAV, DSB, binaural and a 10 kHz filter. Native checks covered Show/Hide, X-to-hide, returning to full-panel mode without restarting, preserved UI instances and selected tabs, playback and Record Now continuing while hidden, a scheduled job starting and finishing while hidden, and saved compact preferences/window geometry after restart. The existing DSP and scheduling logic were not changed. The floating detail windows use the same panels and SDR# theme service. Physical live receivers, all display scaling settings and every multi-monitor arrangement were not revalidated for this UI change.
+
+Source builds require both the plugin folder and the accompanying **Shared** folder beside it in the VDK. Shared/PluginWindowHost.cs is compiled into each plugin, so no additional runtime DLL is needed.
