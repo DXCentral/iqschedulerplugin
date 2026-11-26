@@ -1,6 +1,6 @@
 # IQ Recorder and Scheduler for SDR#
 
-Preview 1.0.6.0 for SDR# 1922 Beta, Windows x64. The version appears at the top of the plugin. Built with the Airspy VDK and .NET 10. Successful SpyServer captures have been reported during user testing; independent RF-quality comparison and long-duration validation remain outstanding.
+Preview 1.0.7.0 for SDR# 1922 Beta, Windows x64. Adds hourly windows around sunrise/sunset, removes recording JSON sidecars, reduces small-write flushing and increases short storage-stall tolerance. The version appears at the top of the plugin. Built with the Airspy VDK and .NET 10. Independent RF-quality comparison and long-duration validation remain outstanding.
 
 ## Optional compact Show/Hide panel
 
@@ -20,7 +20,7 @@ Hiding a window changes presentation only. SDR# must remain open for ongoing pla
 
 The preview ZIP is the package for users. The source ZIP is for developers. SDR# itself, radio drivers, personal settings, test recordings, and receiver connections are not included.
 
-Keep exactly one installed IQ Scheduler DLL under the Plugins tree. An older loose `Plugins\SDRSharp.IQScheduler.dll`, or another copy under `Plugins\Plugins`, can cause old code or duplicate plugin instances to load. With SDR# closed, move those old DLL copies to a backup folder **outside Plugins**, then extract the package at the installation root. Preserve SDRSharp.config and recordings. Verify **Plugin 1.0.6.0** appears after restarting.
+Keep exactly one installed IQ Scheduler DLL under the Plugins tree. An older loose `Plugins\SDRSharp.IQScheduler.dll`, or another copy under `Plugins\Plugins`, can cause old code or duplicate plugin instances to load. With SDR# closed, move those old DLL copies to a backup folder **outside Plugins**, then extract the package at the installation root. Preserve SDRSharp.config and recordings. Verify **Plugin 1.0.7.0** appears after restarting.
 
 ## Record now
 
@@ -62,7 +62,7 @@ Profiles keep separate SDR# copies and settings under `RecordingReceivers` in th
 Open the **Schedules** tab and choose **Create Schedule…**, name the job, and select a recording plan. With no saved jobs, the tab prominently asks you to create one. Each plan has its own receiver, frequency (kHz or MHz), bandwidth and output folder. A new plan starts with the current window's tuned frequency, with a **Use This Window's Tuned Frequency** button in the editor; it does not silently inherit the Record Now controls. The list and selected-plan details show the saved frequency with its units. The editor shows the controls relevant to that plan:
 
 - Night Watch: begin a chosen number of minutes before sunset; finish a chosen number of minutes after the following sunrise. Record around each hour, such as `:57:00` to `:07:00`, or uncheck the hourly option to record the whole night. Times recalculate for each date throughout the year. Weekday choices refer to the evening the night begins. Hourly windows that meet the night boundaries are shortened to stay inside them.
-- Around Sunrise or Around Sunset: plain Start/End choices, such as **Start 60 minutes before sunrise; End 90 minutes after sunrise**. No signed offset arithmetic or duration calculation is needed.
+- Around Sunrise or Around Sunset: plain Start/End choices, such as **Start 60 minutes before sunrise; End 90 minutes after sunrise**. Leave **Record around each hour (TOH) within this window** unchecked for continuous recording, or check it and choose `:57:00` to `:07:00` to record only hourly windows during that solar period. Weekdays refer to the solar event's date. Boundary windows are clipped to the selected period, matching Night Watch. Existing solar schedules remain continuous until this option is selected.
 - Specific Date, Selected Weekdays or Every Day: choose a start time and either a stop clock time or a duration. A stop time at or before the start means the following day. These overnight windows use the time-zone rules on both dates, including DST.
 - Every Hour: enter a `from` and `to` minute/second. For example, `:57:00` to `:07:00` records ten minutes across the hour.
 - Continuous from Date: start on the selected date/time and continue until stopped or a stop limit is reached.
@@ -107,13 +107,25 @@ I is followed by Q. The 8-bit PCM encoding is unsigned; 16-bit PCM is signed. In
 
 The chosen output folder is a root folder. Files are placed under `YYYY_MM_DD`, using the schedule's selected time zone or the PC's local time zone for Record Now. A continuous recording closes its file at midnight in that zone and continues into the next day's folder. This date rollover does not trigger Stop Recording unless a configured user file limit is also reached. DST days use their actual 23/24/25-hour boundaries.
 
-Filenames contain UTC start time (`Z`), center frequency, output sample rate, and unique session/file identifiers. Each `.wav.json` sidecar includes fractional UTC start time, folder time zone, input/output rates, bandwidth, encoding and container. Timing is estimated from host buffer arrival, not a calibrated hardware/GPS timestamp. Digital filter startup/group delay is not compensated in that estimate.
+Filenames contain UTC start time (`Z`), center frequency, output sample rate, and unique session/file identifiers. The WAV header contains sample rate, format and sample count. **New recordings create only WAV files in the recording folders; `.wav.json` sidecars are no longer written.** Existing sidecars are left in place. Playback, Clock and IQ Reviewer use the WAV/name rather than those sidecars. Filename timestamps have one-second resolution; timing is estimated from host buffer arrival, not a calibrated hardware/GPS timestamp. Digital filter startup/group delay is not compensated in that estimate. Receiver coordination/settings still use internal JSON files outside recording folders; keep those files.
 
 The recorder reports disk/write errors, input rate changes, retunes, and buffer overruns. Normal Stop drains accepted input and closes the WAV header. A crash, power loss, or forced process termination can leave the current file unfinished. Long-running high-rate and multiple-device captures still need testing.
+
+## Short files and recording diagnostics
+
+Version 1.0.7 targets about eight seconds of input buffering, bounded between 8 and 128 MiB per active recording. At 912 kS/s the queue is about 56 MiB; very high rates reach the memory cap sooner. This improves tolerance of brief storage/processing pauses and does not fix an unavailable destination, disconnecting receiver or sustained write speed below the recording rate. An overrun still stops recording explicitly rather than silently omitting IQ samples.
+
+Buffered data is flushed/published roughly every quarter second of captured samples, and completely at file rollover or stop. Live Rewind sees only flushed samples, so its readable recording tail can lag by that interval. Closing still finalizes all accepted data. This removes the former flush on every 8,192-sample writer block.
+
+Each receiver retains a completion record under **RecordingLogs** beside its own `SDRSharp.exe`. The `.log` records actual versus requested duration, queue capacity, last file and the stop/error reason. Independent receiver logs are under that receiver's `RecordingReceivers` directory. These logs are outside the IQ destination and do not create a sidecar per WAV; logging is best effort if the installation folder cannot be written.
+
+Very short files in the middle of an otherwise normal TOH run can indicate an interrupted capture. A 33 KiB PCM16/RF64 file is approximately one writer block, not a ten-minute recording. A short first/last window at an exact solar boundary or midnight/file split can instead be intentional; inspect the plan preview and diagnostic log. If a problem recurs, retain the affected filename and that receiver's log. The reported overnight issue has not been reproduced on the reporting user's hardware/storage, so its original cause remains unconfirmed.
 
 ## Validation and preview limits
 
 Release build: 0 warnings, 0 errors. Tests ran inside SDR# 1922 with its native DSP and Baseband File Player:
+
+Version 1.0.7 validation is supplied in `VALIDATION.json`: screenshot-equivalent Night Watch durations, sunrise/sunset TOH intersections including DST transition dates, solar editor controls and persistence, a controlled two-second file-open stall in instrumented old/new worker copies, and an unmodified-release native controller capture with exact sample counts and WAV-only output. The instrumented worker test also checks date rollover, file limits and flushed Live Rewind indexing. This establishes a storage-stall failure mechanism and improved tolerance; it does not diagnose the reporting user's drive. The older checks below describe historical validation of their respective versions.
 
 - Six-second 20 kS/s narrow recording: exactly 120,000 complex samples across four files.
 - Stop-at-limit: one 1.98-second file, no restart.
